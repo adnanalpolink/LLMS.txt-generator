@@ -73,5 +73,5 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 ## Contact
 
-Your Name - Adnan Akram: [LinkedIn](http://linkedin.com/in/adnanakram1/)
+Adnan Akram: [LinkedIn](http://linkedin.com/in/adnanakram1/) Profile
 Project Link: [https://github.com/adnanalpolink/llms-txt-generator](https://github.com/adnanalpolink/llms-txt-generator)
