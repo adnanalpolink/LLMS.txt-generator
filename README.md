@@ -2,7 +2,8 @@
 
 Generate standardized llms.txt files for any website according to the [AnswerDotAI specification](https://github.com/AnswerDotAI/llms-txt).
 
-![LLMS.txt Generator Screenshot](docs/screenshot.png)
+![image](https://github.com/user-attachments/assets/5dfe08cd-3674-4ac8-b7f3-b084fabc9722)
+
 
 ## Features
 
