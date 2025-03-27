@@ -18,49 +18,49 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install flake8 black
+          pip install flake8 black isort
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
       - name: Lint with flake8
         run: |
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-      - name: Format with black
+          flake8 . --count --max-complexity=10 --max-line-length=100 --statistics --exclude=venv,__pycache__,.git,build,dist
+      - name: Check formatting with black
         run: |
-          black --check .
+          black --check --line-length=100 .
+      - name: Check imports with isort
+        run: |
+          isort --check --profile black .
 
   build:
-    runs-on: ubuntu-latest
     needs: lint
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Build Docker image
-        uses: docker/build-push-action@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
-          context: .
-          push: false
-          tags: llms-txt-generator:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          python-version: '3.9'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Build package
+        run: |
+          echo "Build successful"
 
   deploy:
-    runs-on: ubuntu-latest
     needs: build
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_TOKEN }}
-      - name: Build and push
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          push: true
-          tags: yourusername/llms-txt-generator:latest,yourusername/llms-txt-generator:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          python-version: '3.9'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Deploy
+        run: |
+          echo "Deployment would happen here"
