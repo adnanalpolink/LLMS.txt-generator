@@ -34,6 +34,7 @@ st.markdown("""
         margin-top: 1rem;
     }
     .download-btn:hover {background-color: #0D47A1;}
+    .download-btn {color: white !important;}
     footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
