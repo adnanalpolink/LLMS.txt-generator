@@ -11,11 +11,12 @@ import logging
 import concurrent.futures
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, urljoin
-from dotenv import load_dotenv
 from datetime import datetime
 
-# Load environment variables
-load_dotenv()
+# Environment variables
+REQUEST_TIMEOUT = int(os.getenv('REQUEST_TIMEOUT', 10))
+MAX_URLS_PER_SECTION = int(os.getenv('MAX_URLS_PER_SECTION', 10))
+MAX_WORKERS = int(os.getenv('MAX_WORKERS', 5))
 
 # Set up logging
 logging.basicConfig(
