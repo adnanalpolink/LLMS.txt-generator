@@ -438,11 +438,10 @@ def main():
         st.markdown("""
         - [Official llms.txt Specification](https://llmstxt.org/)
         - [AnswerDotAI Repository](https://github.com/AnswerDotAI/llms-txt)
-        - [llms.txt Generator on GitHub](https://github.com/yourusername/llms-txt-generator)
         """)
         
         st.markdown("---")
-        st.caption("© 2025 LLMS.txt Generator")
+        st.caption("© 2025 LLMS.txt Generator | Adnan Akram")
 
 if __name__ == "__main__":
     main()
