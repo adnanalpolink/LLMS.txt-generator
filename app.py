@@ -438,7 +438,6 @@ def main():
         st.markdown("""
         - [Official llms.txt Specification](https://llmstxt.org/)
         - [AnswerDotAI Repository](https://github.com/AnswerDotAI/llms-txt)
-        - [llms.txt Generator on GitHub](https://github.com/yourusername/llms-txt-generator)
         """)
         
         st.markdown("---")
