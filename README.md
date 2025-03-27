@@ -73,6 +73,5 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 ## Contact
 
-Your Name - [@yourusername](https://twitter.com/yourusername) - email@example.com
-
-Project Link: [https://github.com/yourusername/llms-txt-generator](https://github.com/yourusername/llms-txt-generator)
+Your Name - Adnan Akram: [LinkedIn](http://linkedin.com/in/adnanakram1/)
+Project Link: [https://github.com/adnanalpolink/llms-txt-generator](https://github.com/adnanalpolink/llms-txt-generator)
