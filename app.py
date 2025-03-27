@@ -442,7 +442,7 @@ def main():
         """)
         
         st.markdown("---")
-        st.caption("© 2025 LLMS.txt Generator")
+        st.caption("© 2025 LLMS.txt Generator | Adnan Akram")
 
 if __name__ == "__main__":
     main()
