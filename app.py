@@ -325,17 +325,34 @@ def check_llm_crawler_accessibility(domain):
     results = []
     blocked_crawlers = []
     
-    # First check robots.txt
+    # Check robots.txt
     try:
         robots_url = f"https://{domain}/robots.txt"
         response = requests.get(robots_url, timeout=10)
         if response.status_code == 200:
-            robots_content = response.text.lower()
-            for crawler in llm_crawlers.keys():
-                if f"user-agent: {crawler.lower()}" in robots_content:
-                    blocked_crawlers.append(crawler)
-    except:
-        pass
+            robots_content = response.text.split('\n')
+            current_user_agent = None
+            disallow_rules = []
+            
+            for line in robots_content:
+                line = line.strip().lower()
+                if line.startswith('user-agent:'):
+                    current_user_agent = line.split(':', 1)[1].strip()
+                    disallow_rules = []
+                elif line.startswith('disallow:') and current_user_agent:
+                    disallow_rules.append(line.split(':', 1)[1].strip())
+                    
+                    # Check if this user agent matches any of our crawlers
+                    for crawler_name, crawler_ua in llm_crawlers.items():
+                        crawler_ua_base = crawler_ua.split('/')[0].lower()
+                        if (current_user_agent == '*' or 
+                            crawler_ua_base in current_user_agent or 
+                            current_user_agent in crawler_ua_base):
+                            if any(rule == '/' for rule in disallow_rules):
+                                if crawler_name not in blocked_crawlers:
+                                    blocked_crawlers.append(crawler_name)
+    except Exception as e:
+        st.error(f"Error checking robots.txt: {str(e)}")
     
     # Test each crawler
     for crawler, user_agent in llm_crawlers.items():
@@ -348,10 +365,10 @@ def check_llm_crawler_accessibility(domain):
                 "status": status,
                 "status_code": response.status_code
             })
-        except:
+        except Exception as e:
             results.append({
                 "crawler": crawler,
-                "status": "Failed (Connection Error)",
+                "status": f"Failed (Connection Error: {str(e)})",
                 "status_code": None
             })
     
