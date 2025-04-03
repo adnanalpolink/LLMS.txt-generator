@@ -293,36 +293,58 @@ def get_download_link(content, filename="llms.txt"):
     return href
 
 def check_llm_crawler_accessibility(domain):
-    """Check if various LLM crawlers can access the domain."""
-    # List of LLM crawlers and their user agents
-    llm_crawlers = {
-        "AI2Bot": "AI2Bot/1.0",
-        "Amazonbot": "Amazonbot/1.0",
-        "AnthropicAIBot": "AnthropicAIBot/1.0",
-        "Applebot": "Applebot/1.0",
-        "Applebot-Extended": "Applebot-Extended/1.0",
-        "BingBot": "BingBot/1.0",
-        "Bytespider": "Bytespider/1.0",
-        "CCBot": "CCBot/1.0",
-        "ChatGPT-Use": "ChatGPT-Use/1.0",
-        "ClaudeBot": "ClaudeBot/1.0",
-        "ClaudeWeb": "ClaudeWeb/1.0",
-        "CohereAI": "CohereAI/1.0",
-        "DiffBot": "DiffBot/1.0",
-        "DuckAssistBot": "DuckAssistBot/1.0",
-        "FacebookBot": "FacebookBot/1.0",
-        "GPTBot": "GPTBot/1.0",
-        "Google-Extended": "Google-Extended/1.0",
-        "LinkedInBot": "LinkedInBot/1.0",
-        "MetaExternalFetcher": "MetaExternalFetcher/1.0",
-        "OAI-SearchBot": "OAI-SearchBot/1.0",
-        "OmgiliBot": "OmgiliBot/1.0",
-        "PerplexityBot": "PerplexityBot/1.0",
-        "Timpi": "Timpi/1.0",
-        "YouBot": "YouBot/1.0"
-    }
+    """Check if various LLM crawlers are blocked in robots.txt."""
+    # List of LLM crawlers
+    llm_crawlers = [
+        "AI2Bot",
+        "Ai2Bot-Dolma",
+        "Amazonbot",
+        "anthropic-ai",
+        "Applebot",
+        "Applebot-Extended",
+        "Brightbot 1.0",
+        "Bytespider",
+        "CCBot",
+        "ChatGPT-User",
+        "Claude-Web",
+        "ClaudeBot",
+        "cohere-ai",
+        "cohere-training-data-crawler",
+        "Crawlspace",
+        "Diffbot",
+        "DuckAssistBot",
+        "FacebookBot",
+        "FriendlyCrawler",
+        "Google-Extended",
+        "GoogleOther",
+        "GoogleOther-Image",
+        "GoogleOther-Video",
+        "GPTBot",
+        "iaskspider/2.0",
+        "ICC-Crawler",
+        "ImagesiftBot",
+        "img2dataset",
+        "ISSCyberRiskCrawler",
+        "Kangaroo Bot",
+        "Meta-ExternalAgent",
+        "Meta-ExternalFetcher",
+        "OAI-SearchBot",
+        "omgili",
+        "omgilibot",
+        "PanguBot",
+        "PerplexityBot",
+        "Perplexity‑User",
+        "PetalBot",
+        "Scrapy",
+        "SemrushBot-OCOB",
+        "SemrushBot-SWA",
+        "Sidetrade indexer bot",
+        "Timpibot",
+        "VelenPublicWebCrawler",
+        "Webzio-Extended",
+        "YouBot"
+    ]
     
-    results = []
     blocked_crawlers = []
     
     # Check robots.txt
@@ -335,86 +357,41 @@ def check_llm_crawler_accessibility(domain):
             disallow_rules = []
             
             for line in robots_content:
-                line = line.strip().lower()
-                if line.startswith('user-agent:'):
+                line = line.strip()
+                if line.lower().startswith('user-agent:'):
                     current_user_agent = line.split(':', 1)[1].strip()
                     disallow_rules = []
-                elif line.startswith('disallow:') and current_user_agent:
+                elif line.lower().startswith('disallow:') and current_user_agent:
                     disallow_rules.append(line.split(':', 1)[1].strip())
                     
                     # Check if this user agent matches any of our crawlers
-                    for crawler_name, crawler_ua in llm_crawlers.items():
-                        crawler_ua_base = crawler_ua.split('/')[0].lower()
+                    for crawler in llm_crawlers:
                         if (current_user_agent == '*' or 
-                            crawler_ua_base in current_user_agent or 
-                            current_user_agent in crawler_ua_base):
+                            crawler.lower() in current_user_agent.lower() or 
+                            current_user_agent.lower() in crawler.lower()):
                             if any(rule == '/' for rule in disallow_rules):
-                                if crawler_name not in blocked_crawlers:
-                                    blocked_crawlers.append(crawler_name)
+                                if crawler not in blocked_crawlers:
+                                    blocked_crawlers.append(crawler)
     except Exception as e:
         st.error(f"Error checking robots.txt: {str(e)}")
     
-    # Test each crawler with rate limiting
-    for crawler, user_agent in llm_crawlers.items():
-        try:
-            headers = {"User-Agent": user_agent}
-            response = requests.get(f"https://{domain}", headers=headers, timeout=10)
-            
-            if response.status_code == 429:
-                status = "Failed (Rate Limited - Too Many Requests)"
-                st.warning(f"⚠️ Rate limiting detected for {crawler}. Waiting before next request...")
-                time.sleep(5)  # Wait 5 seconds before next request
-            elif response.status_code == 403:
-                status = "Failed (Access Forbidden - Site is blocking this crawler)"
-            elif response.status_code == 200:
-                status = "Success"
-            else:
-                status = f"Failed (Status Code: {response.status_code})"
-            
-            results.append({
-                "crawler": crawler,
-                "status": status,
-                "status_code": response.status_code
-            })
-            
-            # Add a small delay between requests to avoid rate limiting
-            time.sleep(1)
-            
-        except Exception as e:
-            results.append({
-                "crawler": crawler,
-                "status": f"Failed (Connection Error: {str(e)})",
-                "status_code": None
-            })
-            time.sleep(1)  # Still add delay even on error
-    
-    return results, blocked_crawlers
+    return blocked_crawlers
 
-def display_crawler_results(results, blocked_crawlers):
-    """Display the crawler accessibility results in a nice format."""
-    st.subheader("✅ Site Access")
+def display_crawler_results(blocked_crawlers):
+    """Display the crawler blocking results in a nice format."""
+    st.subheader("✅ Robots.txt Check")
     st.markdown("""
-    This tool helps you understand whether the automated systems that aid in learning and interpreting website content—known as large language model (LLM) crawlers—can successfully access your site's content.
+    This tool checks if any LLM crawlers are blocked in your robots.txt file.
     """)
-    
-    success_count = sum(1 for r in results if r["status"].startswith("Success"))
-    total_count = len(results)
-    
-    st.markdown(f"**{success_count} of {total_count} crawlers succeeded.** " + 
-                ("Congratulations! All LLM crawlers can access your site." if success_count == total_count else 
-                 "Some crawlers cannot access your site."))
     
     if blocked_crawlers:
         st.warning("⚠️ The following crawlers are blocked in your robots.txt file:")
         for crawler in blocked_crawlers:
             st.markdown(f"- {crawler}")
         st.info("To allow these crawlers, please remove their entries from your robots.txt file.")
-    
-    with st.expander("Toggle Detailed Results"):
-        for result in results:
-            status_color = "green" if result["status"].startswith("Success") else "red"
-            st.markdown(f"**{result['crawler']}** - <span style='color:{status_color}'>{result['status']}</span>", 
-                       unsafe_allow_html=True)
+    else:
+        st.success("✅ No LLM crawlers are blocked in your robots.txt file!")
+        st.info("Your site is accessible to all LLM crawlers according to robots.txt rules.")
 
 def main():
     """Main application function."""
@@ -518,8 +495,8 @@ def main():
                     type="primary",
                     help="Click to check if LLM crawlers can access your site"):
             with st.spinner("Checking crawler accessibility..."):
-                results, blocked_crawlers = check_llm_crawler_accessibility(domain)
-                display_crawler_results(results, blocked_crawlers)
+                blocked_crawlers = check_llm_crawler_accessibility(domain)
+                display_crawler_results(blocked_crawlers)
 
     # Add sidebar with additional information
     with st.sidebar:
