@@ -244,7 +244,7 @@ def generate_llms_txt(urls, site_name, site_description, status_placeholder=None
     
     # Generate status updates
     if status_placeholder:
-        status_placeholder.write("Categorizing URLs...")
+        status_placeholder.write("Processing URLs...")
     
     # Get the base URL from the first URL
     base_url = urlparse(urls[0]).netloc
@@ -256,9 +256,6 @@ def generate_llms_txt(urls, site_name, site_description, status_placeholder=None
     if not site_description:
         site_description = f"Information about {site_name}"
     
-    # Categorize URLs
-    categorized = categorize_urls(urls)
-    
     # Start building the llms.txt content
     content = []
     
@@ -267,57 +264,21 @@ def generate_llms_txt(urls, site_name, site_description, status_placeholder=None
     content.append(f"> {site_description}")
     content.append("")
     
-    # Define category configurations
-    categories = [
-        {"key": "docs", "title": "Documentation", "desc": "Documentation resource"},
-        {"key": "api", "title": "API Reference", "desc": "API documentation"},
-        {"key": "examples", "title": "Examples", "desc": "Example or demo"},
-        {"key": "guides", "title": "Guides & Tutorials", "desc": "Guide or tutorial"}
-    ]
+    # Add Docs section
+    content.append("## Docs")
+    content.append("")
     
-    # Track sections added
-    sections_added = 0
+    # Process all URLs
+    if status_placeholder:
+        status_placeholder.write("Processing URLs...")
     
-    # Process each category
-    for category in categories:
-        key = category["key"]
-        cat_urls = categorized[key]
-        
-        if cat_urls:
-            if status_placeholder:
-                status_placeholder.write(f"Processing {category['title']} URLs...")
-            
-            content.append(f"## {category['title']}")
-            
-            # Process all URLs in this category
-            processed_urls = batch_process_urls(
-                cat_urls,
-                category["desc"]
-            )
-            
-            # Add processed URLs to content
-            for title, desc, url in processed_urls:
-                content.append(f"- [{title}]({url}): {clean_description(desc)}")
-            
-            content.append("")
-            sections_added += 1
+    processed_urls = batch_process_urls(urls, "Resource information")
     
-    # If there are any uncategorized URLs, add them to Resources section
-    if categorized["other"]:
-        if status_placeholder:
-            status_placeholder.write("Processing additional resources...")
-        
-        content.append("## Resources")
-        
-        processed_urls = batch_process_urls(
-            categorized["other"],
-            "Resource information"
-        )
-        
-        for title, desc, url in processed_urls:
-            content.append(f"- [{title}]({url}): {clean_description(desc)}")
-        
-        content.append("")
+    # Add all URLs to content
+    for title, desc, url in processed_urls:
+        content.append(f"- [{title}]({url}): {clean_description(desc)}")
+    
+    content.append("")
     
     # Add timestamp at the end
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -502,25 +463,9 @@ def main():
                            "3. Make sure it's accessible at https://yourdomain.com/llms.txt\n"
                            "4. Verify it with the [llms.txt validator](https://llmstxt.org/validator)")
                     
-                    # Display stats
+                    # Display simple stats
                     st.subheader("Statistics")
-                    col_stats1, col_stats2 = st.columns(2)
-                    
-                    # Calculate statistics
-                    categorized = categorize_urls(urls)
-                    
-                    with col_stats1:
-                        st.metric("Total URLs", len(urls))
-                        st.metric("Documentation URLs", len(categorized["docs"]))
-                        st.metric("API Reference URLs", len(categorized["api"]))
-                    
-                    with col_stats2:
-                        st.metric("Guide URLs", len(categorized["guides"]))
-                        st.metric("Other URLs", len(categorized["other"]))
-                        # Add percentage of categorized content
-                        categorized_count = len(categorized["docs"]) + len(categorized["api"]) + len(categorized["guides"])
-                        percentage = round((categorized_count / len(urls)) * 100 if urls else 0, 1)
-                        st.metric("Categorized Content", f"{percentage}%")
+                    st.metric("Total URLs", len(urls))
     
     with tab2:
         st.subheader("🔍 Check LLM Crawler Accessibility")
