@@ -354,23 +354,39 @@ def check_llm_crawler_accessibility(domain):
     except Exception as e:
         st.error(f"Error checking robots.txt: {str(e)}")
     
-    # Test each crawler
+    # Test each crawler with rate limiting
     for crawler, user_agent in llm_crawlers.items():
         try:
             headers = {"User-Agent": user_agent}
             response = requests.get(f"https://{domain}", headers=headers, timeout=10)
-            status = "Success" if response.status_code == 200 else f"Failed (Status Code: {response.status_code})"
+            
+            if response.status_code == 429:
+                status = "Failed (Rate Limited - Too Many Requests)"
+                st.warning(f"⚠️ Rate limiting detected for {crawler}. Waiting before next request...")
+                time.sleep(5)  # Wait 5 seconds before next request
+            elif response.status_code == 403:
+                status = "Failed (Access Forbidden - Site is blocking this crawler)"
+            elif response.status_code == 200:
+                status = "Success"
+            else:
+                status = f"Failed (Status Code: {response.status_code})"
+            
             results.append({
                 "crawler": crawler,
                 "status": status,
                 "status_code": response.status_code
             })
+            
+            # Add a small delay between requests to avoid rate limiting
+            time.sleep(1)
+            
         except Exception as e:
             results.append({
                 "crawler": crawler,
                 "status": f"Failed (Connection Error: {str(e)})",
                 "status_code": None
             })
+            time.sleep(1)  # Still add delay even on error
     
     return results, blocked_crawlers
 
