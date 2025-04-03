@@ -329,6 +329,97 @@ def get_download_link(content, filename="llms.txt"):
     href = f'<a href="data:file/txt;base64,{b64}" download="{filename}" class="download-btn">Download {filename}</a>'
     return href
 
+def check_llm_crawler_accessibility(domain):
+    """Check if various LLM crawlers can access the domain."""
+    # List of LLM crawlers and their user agents
+    llm_crawlers = {
+        "AI2Bot": "AI2Bot/1.0",
+        "Amazonbot": "Amazonbot/1.0",
+        "AnthropicAIBot": "AnthropicAIBot/1.0",
+        "Applebot": "Applebot/1.0",
+        "Applebot-Extended": "Applebot-Extended/1.0",
+        "BingBot": "BingBot/1.0",
+        "Bytespider": "Bytespider/1.0",
+        "CCBot": "CCBot/1.0",
+        "ChatGPT-Use": "ChatGPT-Use/1.0",
+        "ClaudeBot": "ClaudeBot/1.0",
+        "ClaudeWeb": "ClaudeWeb/1.0",
+        "CohereAI": "CohereAI/1.0",
+        "DiffBot": "DiffBot/1.0",
+        "DuckAssistBot": "DuckAssistBot/1.0",
+        "FacebookBot": "FacebookBot/1.0",
+        "GPTBot": "GPTBot/1.0",
+        "Google-Extended": "Google-Extended/1.0",
+        "LinkedInBot": "LinkedInBot/1.0",
+        "MetaExternalFetcher": "MetaExternalFetcher/1.0",
+        "OAI-SearchBot": "OAI-SearchBot/1.0",
+        "OmgiliBot": "OmgiliBot/1.0",
+        "PerplexityBot": "PerplexityBot/1.0",
+        "Timpi": "Timpi/1.0",
+        "YouBot": "YouBot/1.0"
+    }
+    
+    results = []
+    blocked_crawlers = []
+    
+    # First check robots.txt
+    try:
+        robots_url = f"https://{domain}/robots.txt"
+        response = requests.get(robots_url, timeout=10)
+        if response.status_code == 200:
+            robots_content = response.text.lower()
+            for crawler in llm_crawlers.keys():
+                if f"user-agent: {crawler.lower()}" in robots_content:
+                    blocked_crawlers.append(crawler)
+    except:
+        pass
+    
+    # Test each crawler
+    for crawler, user_agent in llm_crawlers.items():
+        try:
+            headers = {"User-Agent": user_agent}
+            response = requests.get(f"https://{domain}", headers=headers, timeout=10)
+            status = "Success" if response.status_code == 200 else f"Failed (Status Code: {response.status_code})"
+            results.append({
+                "crawler": crawler,
+                "status": status,
+                "status_code": response.status_code
+            })
+        except:
+            results.append({
+                "crawler": crawler,
+                "status": "Failed (Connection Error)",
+                "status_code": None
+            })
+    
+    return results, blocked_crawlers
+
+def display_crawler_results(results, blocked_crawlers):
+    """Display the crawler accessibility results in a nice format."""
+    st.subheader("✅ Site Access")
+    st.markdown("""
+    This tool helps you understand whether the automated systems that aid in learning and interpreting website content—known as large language model (LLM) crawlers—can successfully access your site's content.
+    """)
+    
+    success_count = sum(1 for r in results if r["status"].startswith("Success"))
+    total_count = len(results)
+    
+    st.markdown(f"**{success_count} of {total_count} crawlers succeeded.** " + 
+                ("Congratulations! All LLM crawlers can access your site." if success_count == total_count else 
+                 "Some crawlers cannot access your site."))
+    
+    if blocked_crawlers:
+        st.warning("⚠️ The following crawlers are blocked in your robots.txt file:")
+        for crawler in blocked_crawlers:
+            st.markdown(f"- {crawler}")
+        st.info("To allow these crawlers, please remove their entries from your robots.txt file.")
+    
+    with st.expander("Toggle Detailed Results"):
+        for result in results:
+            status_color = "green" if result["status"].startswith("Success") else "red"
+            st.markdown(f"**{result['crawler']}** - <span style='color:{status_color}'>{result['status']}</span>", 
+                       unsafe_allow_html=True)
+
 def main():
     """Main application function."""
     st.title("🤖 LLMS.txt Generator")
@@ -342,84 +433,97 @@ def main():
         This tool helps you generate a well-formatted `llms.txt` file for your website by analyzing your sitemap or a list of URLs.
         """)
     
-    col1, col2 = st.columns([3, 2])
+    # Add tabs for different functionalities
+    tab1, tab2 = st.tabs(["Generate LLMS.txt", "Check Crawler Access"])
     
-    with col1:
-        st.subheader("Website Information")
-        site_name = st.text_input("Website Name", placeholder="My Website")
-        site_description = st.text_area("Website Description", 
-                                       placeholder="A brief description of what your website is about", 
-                                       height=100)
-    
-    with col2:
-        st.subheader("URL Source")
-        input_type = st.radio("Select input type:", ["Sitemap URL", "CSV Upload"])
+    with tab1:
+        col1, col2 = st.columns([3, 2])
         
-        if input_type == "Sitemap URL":
-            sitemap_url = st.text_input("Sitemap URL", placeholder="https://example.com/sitemap.xml")
-            input_ready = sitemap_url.strip() != ""
-        else:
-            uploaded_file = st.file_uploader("Upload CSV with URLs", type=['csv'])
-            input_ready = uploaded_file is not None
-    
-    if st.button("Generate LLMS.txt", disabled=not input_ready, type="primary"):
-        with st.spinner("Processing URLs..."):
-            # Extract URLs based on the selected input type
-            if input_type == "Sitemap URL":
-                urls = extract_urls_from_sitemap(sitemap_url)
-            else:
-                urls = extract_urls_from_csv(uploaded_file)
+        with col1:
+            st.subheader("Website Information")
+            site_name = st.text_input("Website Name", placeholder="My Website")
+            site_description = st.text_area("Website Description", 
+                                           placeholder="A brief description of what your website is about", 
+                                           height=100)
+        
+        with col2:
+            st.subheader("URL Source")
+            input_type = st.radio("Select input type:", ["Sitemap URL", "CSV Upload"])
             
-            if not urls:
-                st.error("No valid URLs found. Please check your input.")
+            if input_type == "Sitemap URL":
+                sitemap_url = st.text_input("Sitemap URL", placeholder="https://example.com/sitemap.xml")
+                input_ready = sitemap_url.strip() != ""
             else:
-                st.success(f"Found {len(urls)} URLs.")
+                uploaded_file = st.file_uploader("Upload CSV with URLs", type=['csv'])
+                input_ready = uploaded_file is not None
+        
+        if st.button("Generate LLMS.txt", disabled=not input_ready, type="primary"):
+            with st.spinner("Processing URLs..."):
+                # Extract URLs based on the selected input type
+                if input_type == "Sitemap URL":
+                    urls = extract_urls_from_sitemap(sitemap_url)
+                else:
+                    urls = extract_urls_from_csv(uploaded_file)
                 
-                # Use default values if not provided
-                if not site_name:
-                    domain = urlparse(urls[0]).netloc
-                    site_name = domain.split('.')[-2].capitalize() if len(domain.split('.')) > 1 else domain
-                
-                if not site_description:
-                    site_description = f"Information about {site_name}"
-                
-                # Process URLs and generate llms.txt
-                status_container = st.empty()
-                with st.spinner("Generating LLMS.txt..."):
-                    llms_txt_content = generate_llms_txt(urls, site_name, site_description, status_container)
-                
-                status_container.success("LLMS.txt generated successfully!")
-                
-                # Display the generated content
-                st.subheader("Generated LLMS.txt")
-                st.text_area("Content", llms_txt_content, height=400)
-                
-                # Provide download link
-                st.markdown(get_download_link(llms_txt_content), unsafe_allow_html=True)
-                
-                # Usage instructions
-                st.info("### How to use your llms.txt file\n\n"
-                       "1. Download the generated file\n"
-                       "2. Upload it to your website's root directory\n"
-                       "3. Make sure it's accessible at https://yourdomain.com/llms.txt\n"
-                       "4. Verify it with the [llms.txt validator](https://llmstxt.org/validator)")
-                
-                # Display stats
-                st.subheader("Statistics")
-                col_stats1, col_stats2 = st.columns(2)
-                
-                # Calculate statistics
-                categorized = categorize_urls(urls)
-                
-                with col_stats1:
-                    st.metric("Total URLs Processed", len(urls))
-                    st.metric("Documentation URLs", len(categorized["docs"]))
-                    st.metric("API Reference URLs", len(categorized["api"]))
-                
-                with col_stats2:
-                    st.metric("Example URLs", len(categorized["examples"]))
-                    st.metric("Guide URLs", len(categorized["guides"]))
-                    st.metric("Other URLs", len(categorized["other"]))
+                if not urls:
+                    st.error("No valid URLs found. Please check your input.")
+                else:
+                    st.success(f"Found {len(urls)} URLs.")
+                    
+                    # Use default values if not provided
+                    if not site_name:
+                        domain = urlparse(urls[0]).netloc
+                        site_name = domain.split('.')[-2].capitalize() if len(domain.split('.')) > 1 else domain
+                    
+                    if not site_description:
+                        site_description = f"Information about {site_name}"
+                    
+                    # Process URLs and generate llms.txt
+                    status_container = st.empty()
+                    with st.spinner("Generating LLMS.txt..."):
+                        llms_txt_content = generate_llms_txt(urls, site_name, site_description, status_container)
+                    
+                    status_container.success("LLMS.txt generated successfully!")
+                    
+                    # Display the generated content
+                    st.subheader("Generated LLMS.txt")
+                    st.text_area("Content", llms_txt_content, height=400)
+                    
+                    # Provide download link
+                    st.markdown(get_download_link(llms_txt_content), unsafe_allow_html=True)
+                    
+                    # Usage instructions
+                    st.info("### How to use your llms.txt file\n\n"
+                           "1. Download the generated file\n"
+                           "2. Upload it to your website's root directory\n"
+                           "3. Make sure it's accessible at https://yourdomain.com/llms.txt\n"
+                           "4. Verify it with the [llms.txt validator](https://llmstxt.org/validator)")
+                    
+                    # Display stats
+                    st.subheader("Statistics")
+                    col_stats1, col_stats2 = st.columns(2)
+                    
+                    # Calculate statistics
+                    categorized = categorize_urls(urls)
+                    
+                    with col_stats1:
+                        st.metric("Total URLs Processed", len(urls))
+                        st.metric("Documentation URLs", len(categorized["docs"]))
+                        st.metric("API Reference URLs", len(categorized["api"]))
+                    
+                    with col_stats2:
+                        st.metric("Example URLs", len(categorized["examples"]))
+                        st.metric("Guide URLs", len(categorized["guides"]))
+                        st.metric("Other URLs", len(categorized["other"]))
+    
+    with tab2:
+        st.subheader("Check LLM Crawler Accessibility")
+        domain = st.text_input("Enter your domain (e.g., example.com)", placeholder="example.com")
+        
+        if st.button("Check Accessibility", disabled=not domain.strip()):
+            with st.spinner("Checking crawler accessibility..."):
+                results, blocked_crawlers = check_llm_crawler_accessibility(domain)
+                display_crawler_results(results, blocked_crawlers)
 
     # Add sidebar with additional information
     with st.sidebar:
