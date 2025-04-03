@@ -174,14 +174,20 @@ def categorize_urls(urls):
     
     for url in urls:
         path = urlparse(url).path.lower()
+        # Also check the full URL for categorization
+        full_url = url.lower()
         
-        if any(keyword in path for keyword in ['/docs/', '/documentation/', '/doc/', '/manual/', '/faq/', '/help/']):
+        # Documentation patterns
+        if any(keyword in full_url for keyword in ['doc', 'documentation', 'manual', 'faq', 'help', 'support', 'knowledge']):
             categorized["docs"].append(url)
-        elif any(keyword in path for keyword in ['/example/', '/examples/', '/demo/', '/demos/', '/sample/', '/samples/']):
+        # Example patterns
+        elif any(keyword in full_url for keyword in ['example', 'demo', 'sample', 'showcase', 'trial']):
             categorized["examples"].append(url)
-        elif any(keyword in path for keyword in ['/api/', '/apis/', '/reference/', '/schema/', '/endpoint/', '/endpoints/', '/swagger/']):
+        # API patterns
+        elif any(keyword in full_url for keyword in ['api', 'reference', 'schema', 'endpoint', 'swagger', 'openapi', 'graphql']):
             categorized["api"].append(url)
-        elif any(keyword in path for keyword in ['/guide/', '/guides/', '/tutorial/', '/tutorials/', '/how-to/', '/learn/', '/usage/']):
+        # Guide patterns
+        elif any(keyword in full_url for keyword in ['guide', 'tutorial', 'learn', 'how-to', 'howto', 'getting-started', 'quickstart']):
             categorized["guides"].append(url)
         else:
             categorized["other"].append(url)
