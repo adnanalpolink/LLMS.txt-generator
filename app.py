@@ -433,10 +433,11 @@ def main():
         This tool helps you generate a well-formatted `llms.txt` file for your website by analyzing your sitemap or a list of URLs.
         """)
     
-    # Add tabs for different functionalities
-    tab1, tab2 = st.tabs(["Generate LLMS.txt", "Check Crawler Access"])
+    # Create tabs with clear labels
+    tab1, tab2 = st.tabs(["📄 Generate LLMS.txt", "🔍 Check Crawler Access"])
     
     with tab1:
+        st.subheader("Generate LLMS.txt File")
         col1, col2 = st.columns([3, 2])
         
         with col1:
@@ -517,10 +518,22 @@ def main():
                         st.metric("Other URLs", len(categorized["other"]))
     
     with tab2:
-        st.subheader("Check LLM Crawler Accessibility")
-        domain = st.text_input("Enter your domain (e.g., example.com)", placeholder="example.com")
+        st.subheader("🔍 Check LLM Crawler Accessibility")
+        st.markdown("""
+        This tool helps you check if various LLM crawlers can access your website. It will:
+        - Check your robots.txt file for any blocked crawlers
+        - Test accessibility for 24 different LLM crawlers
+        - Show detailed results for each crawler
+        """)
         
-        if st.button("Check Accessibility", disabled=not domain.strip()):
+        domain = st.text_input("Enter your domain (e.g., example.com)", 
+                             placeholder="example.com",
+                             help="Enter your domain without http:// or https://")
+        
+        if st.button("Check Crawler Accessibility", 
+                    disabled=not domain.strip(),
+                    type="primary",
+                    help="Click to check if LLM crawlers can access your site"):
             with st.spinner("Checking crawler accessibility..."):
                 results, blocked_crawlers = check_llm_crawler_accessibility(domain)
                 display_crawler_results(results, blocked_crawlers)
