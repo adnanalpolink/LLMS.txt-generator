@@ -277,7 +277,6 @@ def generate_llms_txt(urls, site_name, site_description, status_placeholder=None
     
     # Track sections added
     sections_added = 0
-    max_urls_per_section = 10
     
     # Process each category
     for category in categories:
@@ -290,9 +289,9 @@ def generate_llms_txt(urls, site_name, site_description, status_placeholder=None
             
             content.append(f"## {category['title']}")
             
-            # Process URLs for this category (limited to max_urls_per_section)
+            # Process all URLs in this category
             processed_urls = batch_process_urls(
-                cat_urls[:max_urls_per_section], 
+                cat_urls,
                 category["desc"]
             )
             
@@ -303,18 +302,15 @@ def generate_llms_txt(urls, site_name, site_description, status_placeholder=None
             content.append("")
             sections_added += 1
     
-    # If no specific sections were added or there are other URLs, add a general resources section
-    if sections_added == 0 or categorized["other"]:
+    # If there are any uncategorized URLs, add them to Resources section
+    if categorized["other"]:
         if status_placeholder:
             status_placeholder.write("Processing additional resources...")
         
         content.append("## Resources")
         
-        urls_to_process = categorized["other"] if sections_added > 0 else urls
-        limit = 20 if sections_added == 0 else max_urls_per_section
-        
         processed_urls = batch_process_urls(
-            urls_to_process[:limit],
+            categorized["other"],
             "Resource information"
         )
         
