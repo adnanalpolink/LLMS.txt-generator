@@ -514,14 +514,17 @@ def main():
                     categorized = categorize_urls(urls)
                     
                     with col_stats1:
-                        st.metric("Total URLs Processed", len(urls))
+                        st.metric("Total URLs", len(urls))
                         st.metric("Documentation URLs", len(categorized["docs"]))
                         st.metric("API Reference URLs", len(categorized["api"]))
                     
                     with col_stats2:
-                        st.metric("Example URLs", len(categorized["examples"]))
                         st.metric("Guide URLs", len(categorized["guides"]))
                         st.metric("Other URLs", len(categorized["other"]))
+                        # Add percentage of categorized content
+                        categorized_count = len(categorized["docs"]) + len(categorized["api"]) + len(categorized["guides"])
+                        percentage = round((categorized_count / len(urls)) * 100 if urls else 0, 1)
+                        st.metric("Categorized Content", f"{percentage}%")
     
     with tab2:
         st.subheader("🔍 Check LLM Crawler Accessibility")
