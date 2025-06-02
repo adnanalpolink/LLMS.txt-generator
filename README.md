@@ -20,7 +20,8 @@ Generate standardized llms.txt files for any website according to the [AnswerDot
 - **AI-Generated Descriptions**: Integrate with OpenRouter API to generate intelligent, context-aware descriptions
 - **Main Content Extraction**: Focus on primary article content while excluding headers, footers, and navigation
 - **Enhanced Processing**: Better handling of modern web applications and dynamic content
-- **Multiple LLM Models**: Choose from various AI models including Claude, GPT-4, Llama, and more
+- **Multiple LLM Models**: Choose from 25+ categorized AI models including Deepseek, OpenAI, Claude, Gemini, xAI, and Qwen
+- **Custom Model Support**: Enter any OpenRouter-compatible model identifier for maximum flexibility
 
 ## Installation
 
@@ -60,7 +61,14 @@ streamlit run app.py
 1. Get an API key from [OpenRouter](https://openrouter.ai/keys)
 2. Enable "Generate descriptions using AI" checkbox
 3. Enter your OpenRouter API key
-4. Choose your preferred LLM model
+4. Choose from categorized LLM models:
+   - **Deepseek**: Latest reasoning models (including free options)
+   - **OpenAI**: GPT-4.1, ChatGPT-4o, O1 series
+   - **Claude**: Opus-4, Sonnet-4, 3.7-Sonnet (including thinking models)
+   - **Gemini**: 2.5 Flash/Pro preview models
+   - **xAI**: Grok-3 models
+   - **Qwen**: Vision-language models
+   - **Custom Model**: Enter any OpenRouter-compatible model identifier
 5. The system will generate intelligent descriptions based on page content
 
 #### Environment Variables (Optional)

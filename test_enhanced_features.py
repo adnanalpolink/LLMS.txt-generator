@@ -4,7 +4,7 @@ import asyncio
 import logging
 from content_extractor import ContentExtractor, extract_content_sync
 from openrouter_client import OpenRouterClient, generate_description_sync
-from config import DEFAULT_MODEL
+from config import DEFAULT_MODEL, CATEGORIZED_LLM_MODELS, validate_custom_model
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -52,18 +52,72 @@ def test_openrouter_client():
     except Exception as e:
         print(f"❌ OpenRouter client test failed: {str(e)}")
 
+def test_model_validation():
+    """Test model validation functionality."""
+    print("\nTesting model validation...")
+
+    try:
+        # Test valid model names
+        valid_models = [
+            "deepseek/deepseek-r1-0528",
+            "openai/gpt-4.1",
+            "anthropic/claude-3.5-sonnet",
+            "google/gemini-2.5-flash-preview-05-20:thinking",
+            "x-ai/grok-3-beta",
+            "custom-provider/my-model:variant"
+        ]
+
+        for model in valid_models:
+            if validate_custom_model(model):
+                print(f"✅ Valid: {model}")
+            else:
+                print(f"❌ Should be valid: {model}")
+
+        # Test invalid model names
+        invalid_models = [
+            "",
+            "invalid",
+            "provider",
+            "/model",
+            "provider/",
+            "provider model",
+            "provider/model/extra",
+            None
+        ]
+
+        for model in invalid_models:
+            if not validate_custom_model(model):
+                print(f"✅ Correctly rejected: {model}")
+            else:
+                print(f"❌ Should be invalid: {model}")
+
+        # Test categorized models
+        total_models = sum(len(models) for models in CATEGORIZED_LLM_MODELS.values())
+        print(f"✅ Loaded {total_models} categorized models from {len(CATEGORIZED_LLM_MODELS)} providers")
+
+        # Test default model
+        if validate_custom_model(DEFAULT_MODEL):
+            print(f"✅ Default model is valid: {DEFAULT_MODEL}")
+        else:
+            print(f"❌ Default model is invalid: {DEFAULT_MODEL}")
+
+        print("✅ Model validation test passed!")
+
+    except Exception as e:
+        print(f"❌ Model validation test failed: {str(e)}")
+
 def test_enhanced_workflow():
     """Test the complete enhanced workflow."""
     print("\nTesting enhanced workflow...")
-    
+
     test_url = "https://httpbin.org/html"  # Simple HTML test page
-    
+
     try:
         # Test without LLM
         title1, desc1, content1 = extract_content_sync(test_url, use_puppeteer=False)
         print(f"Without LLM - Title: {title1}")
         print(f"Without LLM - Description: {desc1}")
-        
+
         # Test with mock LLM (no API key)
         mock_description = generate_description_sync(
             content=content1,
@@ -72,14 +126,14 @@ def test_enhanced_workflow():
             model=DEFAULT_MODEL,
             api_key=None  # No API key for testing
         )
-        
+
         if mock_description is None:
             print("✅ LLM integration correctly handles missing API key")
         else:
             print(f"LLM Description: {mock_description}")
-        
+
         print("✅ Enhanced workflow test passed!")
-        
+
     except Exception as e:
         print(f"❌ Enhanced workflow test failed: {str(e)}")
 
@@ -87,13 +141,16 @@ def main():
     """Run all tests."""
     print("🧪 Testing Enhanced LLMS.txt Generator Features")
     print("=" * 50)
-    
+
     test_content_extraction()
     test_openrouter_client()
+    test_model_validation()
     test_enhanced_workflow()
-    
+
     print("\n" + "=" * 50)
     print("🎉 All tests completed!")
+    print(f"\nDefault model: {DEFAULT_MODEL}")
+    print(f"Total available models: {sum(len(models) for models in CATEGORIZED_LLM_MODELS.values())}")
     print("\nTo test with real API:")
     print("1. Get an OpenRouter API key from https://openrouter.ai/keys")
     print("2. Set OPENROUTER_API_KEY environment variable")

@@ -46,7 +46,10 @@ This document summarizes the enhancements made to the LLMS.txt Generator to add 
   - Checkbox to enable Puppeteer rendering
   - Checkbox to enable AI descriptions
   - API key input field
-  - LLM model selection dropdown
+  - Categorized LLM model selection dropdown (25+ models)
+  - Custom model input with validation
+  - Provider information display
+  - Free/Thinking model indicators
   - Enhanced status indicators
 
 ## Files Modified/Created
@@ -112,7 +115,21 @@ OPENROUTER_API_KEY=sk-or-v1-your-api-key-here
 - **JavaScript Rendering**: Enable/disable Puppeteer
 - **AI Descriptions**: Enable/disable LLM integration
 - **API Key**: OpenRouter API key input
-- **Model Selection**: Choose from 8+ LLM models
+- **Model Selection**: Choose from 25+ categorized LLM models or enter custom model
+
+### Available Model Categories
+- **Deepseek** (4 models): Latest reasoning models including free options
+- **OpenAI** (7 models): GPT-4.1 series, ChatGPT-4o, O1 preview/mini
+- **Claude** (6 models): Opus-4, Sonnet-4, 3.7-Sonnet with thinking variants
+- **Gemini** (4 models): 2.5 Flash/Pro preview models
+- **xAI** (2 models): Grok-3 beta models
+- **Qwen** (1 model): Vision-language model
+- **Custom**: Any OpenRouter-compatible model identifier
+
+### Model Validation
+- Format: `provider/model-name` or `provider/model-name:variant`
+- Examples: `anthropic/claude-3-opus`, `openai/gpt-4:turbo`
+- Real-time validation with user feedback
 
 ## Benefits of Enhancements
 

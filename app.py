@@ -16,7 +16,14 @@ from typing import Optional, Tuple
 # Import our new modules
 from content_extractor import ContentExtractor, extract_content_sync
 from openrouter_client import OpenRouterClient, generate_description_sync
-from config import DEFAULT_LLM_MODELS, DEFAULT_MODEL, MIN_CONTENT_LENGTH
+from config import (
+    DEFAULT_LLM_MODELS,
+    DEFAULT_MODEL,
+    MIN_CONTENT_LENGTH,
+    CATEGORIZED_LLM_MODELS,
+    validate_custom_model,
+    get_model_display_name
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -597,23 +604,86 @@ def main():
         # LLM Configuration (only show if LLM is enabled)
         if use_llm:
             st.markdown("**LLM Configuration**")
+
+            # API Key input
+            api_key = st.text_input(
+                "OpenRouter API Key",
+                type="password",
+                placeholder="sk-or-v1-...",
+                help="Get your API key from https://openrouter.ai/keys"
+            )
+
+            # Model selection with categorized options
             col5, col6 = st.columns([2, 1])
 
             with col5:
-                api_key = st.text_input(
-                    "OpenRouter API Key",
-                    type="password",
-                    placeholder="sk-or-v1-...",
-                    help="Get your API key from https://openrouter.ai/keys"
-                )
+                # Create categorized options for the selectbox
+                model_options = []
+                model_values = []
 
-            with col6:
-                llm_model = st.selectbox(
+                # Add categorized models
+                for provider, models in CATEGORIZED_LLM_MODELS.items():
+                    for model in models:
+                        display_name = f"{provider}: {get_model_display_name(model)}"
+                        model_options.append(display_name)
+                        model_values.append(model)
+
+                # Add custom model option
+                model_options.append("Custom Model")
+                model_values.append("custom")
+
+                # Find default model index
+                default_index = 0
+                if DEFAULT_MODEL in model_values:
+                    default_index = model_values.index(DEFAULT_MODEL)
+
+                selected_model_display = st.selectbox(
                     "LLM Model",
-                    options=DEFAULT_LLM_MODELS,
-                    index=0,
+                    options=model_options,
+                    index=default_index,
                     help="Choose the AI model for generating descriptions"
                 )
+
+                # Get the actual model value
+                selected_index = model_options.index(selected_model_display)
+                selected_model_value = model_values[selected_index]
+
+            with col6:
+                # Show model info
+                if selected_model_value != "custom":
+                    # Extract provider from model name
+                    provider = selected_model_value.split('/')[0] if '/' in selected_model_value else "Unknown"
+                    st.info(f"**Provider:** {provider.title()}")
+
+                    # Show if it's a free model
+                    if ':free' in selected_model_value:
+                        st.success("🆓 Free Model")
+                    elif ':thinking' in selected_model_value:
+                        st.info("🧠 Thinking Model")
+                else:
+                    st.info("💡 Custom Model")
+
+            # Custom model input (only show if custom is selected)
+            if selected_model_value == "custom":
+                custom_model = st.text_input(
+                    "Custom Model Name",
+                    placeholder="provider/model-name or provider/model-name:variant",
+                    help="Enter any OpenRouter-compatible model identifier (e.g., 'anthropic/claude-3-opus', 'openai/gpt-4:turbo')"
+                )
+
+                # Validate custom model format
+                if custom_model:
+                    if validate_custom_model(custom_model):
+                        st.success(f"✅ Valid model format: `{custom_model}`")
+                        llm_model = custom_model
+                    else:
+                        st.error("❌ Invalid model format. Use: `provider/model-name` or `provider/model-name:variant`")
+                        llm_model = DEFAULT_MODEL
+                else:
+                    st.warning("⚠️ Please enter a custom model name.")
+                    llm_model = DEFAULT_MODEL
+            else:
+                llm_model = selected_model_value
 
             if not api_key:
                 st.warning("⚠️ Please provide an OpenRouter API key to use AI-generated descriptions.")
