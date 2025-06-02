@@ -7,12 +7,20 @@ Generate standardized llms.txt files for any website according to the [AnswerDot
 
 ## Features
 
+### Core Features
 - **Multiple URL Sources**: Process XML sitemaps or CSV files containing URLs
 - **Intelligent Categorization**: Automatically organizes URLs into documentation, API reference, examples, and guides
 - **Content Extraction**: Pulls titles and descriptions from web pages to enhance the llms.txt file
 - **Real-time Progress Tracking**: Visual feedback during processing
 - **One-click Download**: Easily save the generated llms.txt file
 - **Responsive UI**: Works on desktop and mobile devices
+
+### 🚀 Enhanced Features (NEW!)
+- **JavaScript Rendering**: Use Puppeteer to render JavaScript-heavy pages that require browser execution
+- **AI-Generated Descriptions**: Integrate with OpenRouter API to generate intelligent, context-aware descriptions
+- **Main Content Extraction**: Focus on primary article content while excluding headers, footers, and navigation
+- **Enhanced Processing**: Better handling of modern web applications and dynamic content
+- **Multiple LLM Models**: Choose from various AI models including Claude, GPT-4, Llama, and more
 
 ## Installation
 
@@ -34,11 +42,32 @@ streamlit run app.py
 
 ## Usage
 
+### Basic Usage
 1. Enter your website name and description
 2. Choose between sitemap URL or CSV upload
 3. Submit the form to generate your llms.txt file
 4. Review the generated content
 5. Download the file
+
+### Enhanced Features Setup
+
+#### JavaScript Rendering (Puppeteer)
+- Enable "Use Puppeteer for JavaScript-heavy pages" checkbox
+- Useful for Single Page Applications (SPAs) and dynamic content
+- Note: This will be slower but more accurate for JavaScript-dependent sites
+
+#### AI-Generated Descriptions (OpenRouter)
+1. Get an API key from [OpenRouter](https://openrouter.ai/keys)
+2. Enable "Generate descriptions using AI" checkbox
+3. Enter your OpenRouter API key
+4. Choose your preferred LLM model
+5. The system will generate intelligent descriptions based on page content
+
+#### Environment Variables (Optional)
+Create a `.env` file in the project root:
+```bash
+OPENROUTER_API_KEY=sk-or-v1-your-api-key-here
+```
 
 ## Docker Deployment
 
