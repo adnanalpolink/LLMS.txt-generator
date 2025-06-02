@@ -114,56 +114,121 @@ class ContentExtractor:
             return ""
         
         try:
-            # Use readability to extract main content
-            doc = Document(html_content)
-            main_content_html = doc.summary()
-            
-            # Parse with BeautifulSoup for further cleaning
-            soup = BeautifulSoup(main_content_html, 'html.parser')
-            
-            # Remove unwanted elements
-            unwanted_tags = [
+            # Initial parse for pre-cleaning
+            pre_soup = BeautifulSoup(html_content, 'html.parser')
+
+            # Perform aggressive cleaning *before* readability
+            # All cleaning operations below use 'pre_soup'
+
+            unwanted_tag_names = [
                 'script', 'style', 'nav', 'header', 'footer', 
                 'aside', 'advertisement', 'ads', 'sidebar',
-                'menu', 'breadcrumb', 'social', 'share'
+                'menu', 'breadcrumb', 'social', 'share', 'dialog',
+                'form', 'input', 'textarea', 'button', 'select', 'option',
+                'iframe', 'canvas', 'map', 'object', 'embed'
             ]
-            
-            for tag in unwanted_tags:
-                for element in soup.find_all(tag):
+            for tag_name_iter in unwanted_tag_names:
+                for element in pre_soup.find_all(tag_name_iter):
                     element.decompose()
-            
-            # Remove elements with unwanted classes/ids
+
+            specific_selectors = [
+                '[role="navigation"]', '[role="banner"]', '[role="contentinfo"]',
+                '[aria-modal="true"]', '[role="dialog"]', '[role="alert"]',
+                # 'header', 'footer', 'nav', 'aside', # Covered by unwanted_tag_names
+                '.cookie', '#cookie', '.banner', '#banner', '.popup', '#popup',
+                '.modal', '#modal', '.dialog', '#dialog', '.gdpr', '.cc-banner',
+                '[class*="cookie"]', '[id*="cookie"]',
+                '[class*="banner"]', '[id*="banner"]',
+                '[class*="popup"]', '[id*="popup"]',
+                '[class*="modal"]', '[id*="modal"]',
+                '[class*="dialog"]', '[id*="dialog"]',
+                '[class*="consent"]', '[id*="consent"]',
+                '[class*="gdpr"]', '[id*="gdpr"]'
+            ]
+            for selector in specific_selectors:
+                try:
+                    for element in pre_soup.select(selector):
+                        element.decompose()
+                except Exception as e_select:
+                    logger.warning(f"CSS selector error during pre-cleaning: {selector} - {str(e_select)}")
+
             unwanted_patterns = [
-                'nav', 'header', 'footer', 'sidebar', 'menu',
-                'advertisement', 'ads', 'social', 'share',
-                'breadcrumb', 'pagination', 'related', 'comment'
+                'nav', 'header', 'footer', 'sidebar', 'menu', 'masthead', 'bottom',
+                'advertisement', 'ads', 'social', 'share', 'rating', 'metadata',
+                'breadcrumb', 'pagination', 'related', 'comment', 'testimonial', 'author-bio',
+                'cookie', 'banner', 'popup', 'modal', 'dialog', 'consent', 'gdpr',
+                'widget', 'toolbar', 'utility-bar', 'skip-link', 'visually-hidden', 'sr-only',
+                'cookie-consent', 'privacy-popup' # Added from original list that was missed
             ]
-            
             for pattern in unwanted_patterns:
-                # Remove by class
-                for element in soup.find_all(class_=re.compile(pattern, re.I)):
+                for element in pre_soup.find_all(class_=re.compile(r'\b' + pattern + r'\b', re.I)):
                     element.decompose()
-                # Remove by id
-                for element in soup.find_all(id=re.compile(pattern, re.I)):
+                for element in pre_soup.find_all(id=re.compile(r'\b' + pattern + r'\b', re.I)):
                     element.decompose()
+
+            elements_to_remove_hidden = []
+            for element in pre_soup.find_all(True):
+                style = element.get('style', '').replace(' ', '').lower()
+                if 'display:none' in style or 'visibility:hidden' in style:
+                    elements_to_remove_hidden.append(element)
+            for element in elements_to_remove_hidden:
+                element.decompose()
+
+            cleaned_html_for_readability = pre_soup.prettify()
+            doc = Document(cleaned_html_for_readability)
+            main_content_html_from_readability = doc.summary()
+
+            final_soup = BeautifulSoup(main_content_html_from_readability, 'html.parser')
+            text_content = final_soup.get_text(separator=' ', strip=True)
             
-            # Extract text content
-            text_content = soup.get_text(separator=' ', strip=True)
+            if not text_content and html_content:
+                logger.warning("Readability produced empty content from pre-cleaned HTML. Using text from pre-cleaned HTML itself.")
+                text_content = pre_soup.get_text(separator=' ', strip=True)
             
-            # Clean up whitespace
             text_content = re.sub(r'\s+', ' ', text_content).strip()
             
-            # Limit content length
+            if not text_content and html_content:
+                 logger.warning("All extraction methods resulted in empty. Basic pass on original HTML.")
+                 soup_basic_pass = BeautifulSoup(html_content, 'html.parser')
+                 basic_unwanted_tags = ['script', 'style', 'nav', 'header', 'footer', 'aside']
+                 for tag_name_iter_basic in basic_unwanted_tags: # Renamed var
+                     for tag_element_basic in soup_basic_pass.find_all(tag_name_iter_basic):
+                         tag_element_basic.decompose()
+                 text_content = soup_basic_pass.get_text(separator=' ', strip=True)
+                 text_content = re.sub(r'\s+', ' ', text_content).strip()
+
+            text_content = re.sub(r'\s+', ' ', text_content).strip()
+
+            if 0 < len(text_content) < MIN_CONTENT_LENGTH and html_content:
+                pass
+
             if len(text_content) > MAX_CONTENT_LENGTH:
                 text_content = text_content[:MAX_CONTENT_LENGTH] + "..."
             
+            if not text_content and html_content:
+                soup_fallback_body = BeautifulSoup(html_content, 'html.parser') # Renamed var
+                if soup_fallback_body.body:
+                    text_content = soup_fallback_body.body.get_text(separator=' ', strip=True)
+                    text_content = re.sub(r'\s+', ' ', text_content).strip()
+                    if len(text_content) > MAX_CONTENT_LENGTH:
+                        text_content = text_content[:MAX_CONTENT_LENGTH] + "..."
+                if not text_content:
+                    logger.warning("Main content extraction resulted in empty string despite initial HTML content.")
+
             return text_content
             
         except Exception as e:
             logger.error(f"Error extracting main content: {str(e)}")
-            # Fallback to basic text extraction
-            soup = BeautifulSoup(html_content, 'html.parser')
-            return soup.get_text(separator=' ', strip=True)[:MAX_CONTENT_LENGTH]
+            soup_fallback_exception = BeautifulSoup(html_content, 'html.parser')
+            basic_unwanted_tags_exception = ['script', 'style', 'nav', 'header', 'footer', 'aside'] # Renamed var
+            for tag_name_iter_exception in basic_unwanted_tags_exception: # Renamed var
+                for tag_element in soup_fallback_exception.find_all(tag_name_iter_exception):
+                    tag_element.decompose()
+            fallback_text = soup_fallback_exception.get_text(separator=' ', strip=True)
+            fallback_text = re.sub(r'\s+', ' ', fallback_text).strip()
+            if len(fallback_text) > MAX_CONTENT_LENGTH:
+                fallback_text = fallback_text[:MAX_CONTENT_LENGTH] + "..."
+            return fallback_text
     
     def extract_title_and_meta(self, html_content: str, url: str = "") -> Tuple[str, str]:
         """Extract title and meta description from HTML.
