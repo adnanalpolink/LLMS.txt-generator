@@ -229,40 +229,114 @@ def extract_title_and_description(html_content, url=""):
     except Exception:
         return f"Page at {url.split('/')[-1]}", "Resource information"
 
-def categorize_urls(urls):
-    """Categorize URLs into sections based on their path."""
-    categorized = {
-        "docs": [],
-        "examples": [],
-        "api": [],
-        "guides": [],
-        "other": []
-    }
-    
-    for url in urls:
-        path = urlparse(url).path.lower()
-        # Also check the full URL for categorization
-        full_url = url.lower()
-        
-        # Documentation patterns
-        if any(keyword in full_url for keyword in ['doc', 'documentation', 'manual', 'faq', 'help', 'support', 'knowledge']):
-            categorized["docs"].append(url)
-        # Example patterns
-        elif any(keyword in full_url for keyword in ['example', 'demo', 'sample', 'showcase', 'trial']):
-            categorized["examples"].append(url)
-        # API patterns
-        elif any(keyword in full_url for keyword in ['api', 'reference', 'schema', 'endpoint', 'swagger', 'openapi', 'graphql']):
-            categorized["api"].append(url)
-        # Guide patterns
-        elif any(keyword in full_url for keyword in ['guide', 'tutorial', 'learn', 'how-to', 'howto', 'getting-started', 'quickstart']):
-            categorized["guides"].append(url)
-        else:
-            categorized["other"].append(url)
-    
-    return categorized
+def categorize_urls(urls, category_keywords):
+    """Categorize URLs into sections based on keywords in their path or full URL.
 
-def process_url(url, default_desc="Resource", use_puppeteer=False, use_llm=False, llm_model=DEFAULT_MODEL, api_key=None):
-    """Process a single URL to get title and description with enhanced features.
+    Args:
+        urls: A list of URLs to categorize.
+        category_keywords: A dictionary where keys are category names (section titles)
+                           and values are lists of keywords.
+                           Example: {"Introduction": ["intro", "start"], "API": ["api", "reference"]}
+
+    Returns:
+        A dictionary where keys are category names and values are lists of URLs
+        belonging to that category. Includes a fallback "Other" category.
+    """
+    categorized = {category: [] for category in category_keywords}
+    # Ensure "Other" category exists if not defined by user, though it's good practice to include it.
+    if "Other" not in categorized:
+        categorized["Other"] = []
+
+    url_lower_map = {url: url.lower() for url in urls} # Pre-lower case for efficiency
+
+    for url in urls:
+        matched = False
+        url_low = url_lower_map[url]
+        path_low = urlparse(url).path.lower()
+        
+        for category, keywords in category_keywords.items():
+            if category == "Other": # Skip "Other" during keyword matching pass
+                continue
+
+            # Keywords in category_keywords are assumed to be lowercase already
+            if any(kw in url_low for kw in keywords) or \
+               any(kw in path_low for kw in keywords):
+                categorized[category].append(url)
+                matched = True
+                break  # First match wins
+
+        if not matched:
+            categorized["Other"].append(url)
+
+    # Remove empty categories from the final output, except "Other" if it's also empty.
+    # Or, keep all defined categories even if empty, for consistency in llms.txt structure.
+    # For now, let's keep all defined categories. If "Other" is empty and was predefined, it's kept.
+    return {k: v for k, v in categorized.items() if v or k in category_keywords}
+
+
+def find_md_link(url: str) -> Optional[str]:
+    """
+    Checks for a corresponding .md file for a given URL by trying common patterns.
+    Example: https://example.com/docs/feature -> https://example.com/docs/feature.md
+             https://example.com/docs/feature.html -> https://example.com/docs/feature.md
+             https://example.com/docs/feature/ -> https://example.com/docs/feature.md (or feature/feature.md)
+    Makes an HTTP HEAD request to verify existence.
+    """
+    if not url.startswith(('http://', 'https://')):
+        return None
+
+    parsed_url = urlparse(url)
+    path = parsed_url.path
+    base_url_for_md = f"{parsed_url.scheme}://{parsed_url.netloc}"
+    
+    potential_md_paths = set()
+
+    # Common web extensions to replace
+    extensions_to_replace = ['.html', '.htm', '.php', '.aspx', '.asp']
+
+    current_path_segment = path
+
+    # Case 1: URL ends with a common web extension
+    for ext in extensions_to_replace:
+        if current_path_segment.endswith(ext):
+            potential_md_paths.add(current_path_segment[:-len(ext)] + ".md")
+            break
+    else: # No common extension found, or after stripping extension
+        # Case 2: URL ends with a slash (directory-like)
+        if current_path_segment.endswith('/'):
+            # e.g., /docs/feature/ -> /docs/feature.md
+            potential_md_paths.add(current_path_segment[:-1] + ".md")
+            # e.g., /docs/feature/ -> /docs/feature/feature.md (less common for .md but possible)
+            # Only add if path has at least one segment before trailing slash
+            parent_dir_name = current_path_segment.strip('/').split('/')[-1]
+            if parent_dir_name:
+                 potential_md_paths.add(current_path_segment + parent_dir_name + ".md")
+        # Case 3: URL does not end with slash and no common extension (e.g. /docs/feature)
+        else:
+            potential_md_paths.add(current_path_segment + ".md")
+
+    # Construct full URLs and test them
+    for md_path in potential_md_paths:
+        if not md_path: continue
+        # Ensure path starts with a slash
+        md_url_to_check = base_url_for_md + (md_path if md_path.startswith('/') else '/' + md_path)
+        try:
+            head_response = requests.head(md_url_to_check, timeout=2.5, allow_redirects=True) # Short timeout
+            # Allow redirects because site might redirect /feature to /feature.md or vice-versa
+            if head_response.status_code == 200:
+                # Check if the final URL after redirects actually ends with .md
+                if urlparse(head_response.url).path.endswith(".md"):
+                    return head_response.url # Return the potentially redirected URL if it's the .md one
+        except requests.exceptions.Timeout:
+            logging.warning(f"Timeout checking for .md link: {md_url_to_check}")
+        except requests.exceptions.RequestException:
+            pass # Silently ignore other errors (connection, too many redirects, etc.)
+
+    return None
+
+
+def process_url(url, default_desc="Resource", use_puppeteer=False, use_llm=False, llm_model=DEFAULT_MODEL, api_key=None, check_for_md=False):
+    """Process a single URL to get title, description, and optionally an .md link.
 
     Args:
         url: The URL to process
@@ -271,10 +345,12 @@ def process_url(url, default_desc="Resource", use_puppeteer=False, use_llm=False
         use_llm: Whether to use LLM for description generation
         llm_model: The LLM model to use
         api_key: OpenRouter API key
+        check_for_md: Boolean flag to attempt .md link discovery
 
     Returns:
-        Tuple of (title, description, url)
+        Tuple of (title, description, url, md_link)
     """
+    md_link = None
     try:
         title, desc, main_content = get_page_content_enhanced(
             url, use_puppeteer, use_llm, llm_model, api_key
@@ -283,13 +359,16 @@ def process_url(url, default_desc="Resource", use_puppeteer=False, use_llm=False
         title = title if title else url.split('/')[-1]
         desc = desc if desc else default_desc
 
-        return title, desc, url
+        if check_for_md:
+            md_link = find_md_link(url)
+
+        return title, desc, url, md_link
 
     except Exception as e:
         logging.error(f"Error processing URL {url}: {str(e)}")
-        return url.split('/')[-1], default_desc, url
+        return url.split('/')[-1], default_desc, url, None
 
-def batch_process_urls(urls, category_desc="Resource", max_workers=5, use_puppeteer=False, use_llm=False, llm_model=DEFAULT_MODEL, api_key=None):
+def batch_process_urls(urls, category_desc="Resource", max_workers=5, use_puppeteer=False, use_llm=False, llm_model=DEFAULT_MODEL, api_key=None, check_for_md_for_category=False):
     """Process multiple URLs in parallel with enhanced features.
 
     Args:
@@ -300,41 +379,52 @@ def batch_process_urls(urls, category_desc="Resource", max_workers=5, use_puppet
         use_llm: Whether to use LLM for description generation
         llm_model: The LLM model to use
         api_key: OpenRouter API key
+        check_for_md_for_category: Boolean flag to attempt .md link discovery for this batch
 
     Returns:
-        List of tuples (title, description, url)
+        List of tuples (title, description, url, md_link)
     """
     results = []
 
+    actual_max_workers = max_workers
     # Reduce workers if using Puppeteer to avoid resource issues
     if use_puppeteer:
-        max_workers = min(max_workers, 2)
+        actual_max_workers = min(actual_max_workers, 2) # Puppeteer is resource-intensive
+    # Reduce workers further if also checking for .md links to avoid too many outbound requests quickly
+    if check_for_md_for_category:
+        actual_max_workers = min(actual_max_workers, 3) # Max 3 workers if checking .md links
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_url = {
-            executor.submit(
+    # Ensure at least 1 worker
+    actual_max_workers = max(1, actual_max_workers)
+
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=actual_max_workers) as executor:
+        future_to_url_map = {}
+        for u in urls: # Changed variable name to avoid conflict
+            future = executor.submit(
                 process_url,
-                url,
+                u, # Current URL being processed
                 category_desc,
                 use_puppeteer,
                 use_llm,
                 llm_model,
-                api_key
-            ): url for url in urls
-        }
+                api_key,
+                check_for_md_for_category # Pass the flag here
+            )
+            future_to_url_map[future] = u
 
-        for future in concurrent.futures.as_completed(future_to_url):
-            url = future_to_url[future]
+
+        for future in concurrent.futures.as_completed(future_to_url_map):
+            url_processed_item = future_to_url_map[future]
             try:
-                title, desc, _ = future.result()
-                results.append((title, desc, url))
+                result_tuple = future.result() # This will be (title, desc, original_url, md_link)
+                results.append(result_tuple)
             except Exception as e:
-                logging.error(f"Error processing URL {url}: {str(e)}")
-                # Fallback for errors
-                path = urlparse(url).path
+                logging.error(f"Error processing URL {url_processed_item} in batch future: {str(e)}")
+                path = urlparse(url_processed_item).path
                 filename = path.strip('/').split('/')[-1].replace('-', ' ').replace('_', ' ').title()
-                title = filename if filename else url.split('/')[-1]
-                results.append((title, category_desc, url))
+                title = filename if filename else url_processed_item.split('/')[-1]
+                results.append((title, category_desc, url_processed_item, None)) # Add None for md_link in error case
 
     return results
 
@@ -399,29 +489,123 @@ def generate_llms_txt(urls, site_name, site_description, status_placeholder=None
     content.append(f"> {site_description}")
     content.append("")
 
-    # Add Docs section
-    content.append("## Docs")
-    content.append("")
+    # Define default categories and keywords
+    DEFAULT_CATEGORY_KEYWORDS = {
+        "Introduction": ["introduction", "intro", "overview", "about"],
+        "Get started": ["get-started", "getting-started", "quickstart", "setup", "installation"],
+        "Dashboard": ["dashboard", "admin", "console"],
+        "API Reference": ["api", "reference", "sdk", "endpoints", "graphql", "swagger", "rest"],
+        "Guides": [ # Restored to refined list
+            "guide", "tutorial", "how-to", "howto", "walkthrough",
+            "-example", "example-", "_example", "example_",
+            "-examples", "examples-", "_examples", "examples_",
+            "use-case", "getting-started/examples"
+        ],
+        "Other": []  # Fallback category, will catch URLs not matched by others
+    }
+    # Categories eligible for .md link checking
+    MD_CHECK_CATEGORIES = {"API Reference", "Guides", "Docs", "Introduction", "Get started"}
 
-    # Process all URLs with enhanced features
-    if status_placeholder:
-        status_placeholder.write("Processing URLs...")
 
-    processed_urls = batch_process_urls(
-        urls,
-        "Resource information",
-        max_workers=5,
-        use_puppeteer=use_puppeteer,
-        use_llm=use_llm,
-        llm_model=llm_model,
-        api_key=api_key
-    )
+    # Categorize URLs
+    categorized_urls_map = categorize_urls(urls, DEFAULT_CATEGORY_KEYWORDS)
 
-    # Add all URLs to content
-    for title, desc, url in processed_urls:
-        content.append(f"- [{title}]({url}): {clean_description(desc)}")
+    # Process URLs and build content section by section
+    total_processed_count = 0
+    any_category_had_content = False
 
-    content.append("")
+    for category_title, category_urls in categorized_urls_map.items():
+        if not category_urls:
+            # Special handling for "Other": only skip if it's empty AND other categories have/had content or will have content.
+            # If "Other" is the only category with items, it should be processed.
+            # If all categories are empty, nothing gets processed, which is fine.
+            if category_title == "Other":
+                is_other_empty = True
+                other_cats_have_content = False
+                for c_title, c_urls in categorized_urls_map.items():
+                    if c_title != "Other" and c_urls:
+                        other_cats_have_content = True
+                        break
+                if is_other_empty and other_cats_have_content:
+                    continue # Skip empty "Other" if other categories have content
+                elif is_other_empty and not other_cats_have_content and any_category_had_content: # Other is empty, no other cats have content now, but some previous cat had content
+                    continue
+
+            else: # For non-"Other" categories, if it's empty, just skip.
+                continue
+
+        current_category_has_entries = False
+        temp_category_content = [] # Store entries for current category temporarily
+
+        temp_category_content.append(f"## {category_title}")
+        temp_category_content.append("")
+
+        if status_placeholder:
+            status_placeholder.write(f"Processing {len(category_urls)} URLs for {category_title}...")
+
+        should_check_md_for_this_category = category_title in MD_CHECK_CATEGORIES
+
+        processed_category_items = batch_process_urls(
+            category_urls,
+            f"{category_title} resource",
+            max_workers=5,
+            use_puppeteer=use_puppeteer,
+            use_llm=use_llm,
+            llm_model=llm_model,
+            api_key=api_key,
+            check_for_md_for_category=should_check_md_for_this_category
+        )
+
+        for title, desc, url_processed, md_link in processed_category_items:
+            entry = f"- [{title}]({url_processed}): {clean_description(desc)}"
+            if md_link:
+                md_filename = md_link.split('/')[-1]
+                entry += f" ([{md_filename}]({md_link}))"
+            temp_category_content.append(entry)
+            total_processed_count += 1
+            current_category_has_entries = True
+
+        if current_category_has_entries:
+            temp_category_content.append("") # Add a blank line after section's URLs
+            content.extend(temp_category_content)
+            any_category_had_content = True
+        # If no entries for this category, temp_category_content (header and blank line) is discarded.
+
+
+    if total_processed_count == 0 and urls:
+        # Fallback: if no URLs were processed at all despite having initial URLs (e.g. all categories empty, errors)
+        # This should be rare due to the "Other" category logic.
+        if status_placeholder:
+            status_placeholder.write("Processing all URLs under General Information as fallback...")
+
+        content.append("## General Information")
+        content.append("")
+
+        processed_remaining_urls = batch_process_urls(
+            urls,
+            "Resource information",
+            max_workers=5,
+            use_puppeteer=use_puppeteer,
+            use_llm=use_llm,
+            llm_model=llm_model,
+            api_key=api_key,
+            check_for_md_for_category=False # No .md check for this broad fallback
+        )
+        fallback_entries_added = False
+        for title, desc, url_processed, md_link in processed_remaining_urls:
+            content.append(f"- [{title}]({url_processed}): {clean_description(desc)}")
+            fallback_entries_added = True
+
+        if fallback_entries_added:
+            content.append("")
+        else: # No entries for General Information either, remove its header
+            if content and content[-1] == "": content.pop()
+            if content and content[-1] == "## General Information": content.pop()
+
+
+    # Remove the last empty line if it exists and content was actually added
+    if content and content[-1] == "" and total_processed_count > 0 :
+        content.pop()
 
     # Add generation info
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
